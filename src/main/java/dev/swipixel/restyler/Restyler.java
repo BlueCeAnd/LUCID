@@ -216,6 +216,8 @@ public final class Restyler {
     private final int[] fadeW2 = new int[12], fadeH2 = new int[12];
     private final float[][] fadeRect = new float[12][], fadeInner = new float[12][];
     private static final int R_FEATHER = 8;            // 1x px around a tile where it fades in
+    private static final int REF_FULL = 12;            // "tile" id: the whole screen at 2.5x in one run
+    private static final int REF_FULL_MIN = 3;         // standing still with >= 3 tiles to do: one full run is cheaper
     private static final float SHARPEN_MAX_CHANGE = 0.25f;  // sharpen between repaints while < 25 % changes
     private boolean capHaveRef = false;                // the capture in flight brought its 1280x720 version
     private final byte[] refBytes = new byte[REF_W * REF_H * 4];
@@ -236,7 +238,7 @@ public final class Restyler {
     private volatile int jobRefW2, jobRefH2;
     private volatile int[] jobRefRect;                 // its pixels: 1x px, top-down {x0, y0, x1, y1}
     private FloatBuffer wRefIn;
-    private final ByteBuffer wRefRgba = ByteBuffer.allocateDirect(Stabilizer.REF_MAX_W * Stabilizer.REF_MAX_H * 4)
+    private final ByteBuffer wRefRgba = ByteBuffer.allocateDirect(REF_W * REF_H * 4)
             .order(ByteOrder.nativeOrder());
 
     {
@@ -665,12 +667,15 @@ public final class Restyler {
         int fw = main.textureWidth;
         int fh = main.textureHeight;
 
-        // centre 16:9 crop in framebuffer pixels (the crop the network was trained on)
+        // the network sees 16:9 (512x288). Close to 16:9 (maximised window: taskbar / title bar take ~70 px of height)
+        // -> squeeze the WHOLE frame in (<= 15 % stretch, invisible to the network) instead of leaving vanilla side
+        // strips; far from 16:9 (4:3, portrait) -> centre 16:9 crop as before
         int cw = fw;
         int ch = fh;
-        if ((long) fw * H > (long) fh * W) {
+        float aspect = (fw * (float) H) / (fh * (float) W);   // 1 = exactly 16:9
+        if (aspect > 1.15f) {
             cw = Math.round(fh * (float) W / H);
-        } else {
+        } else if (aspect < 1f / 1.15f) {
             ch = Math.round(fw * (float) H / W);
         }
         int cx = (fw - cw) / 2;
@@ -972,7 +977,7 @@ public final class Restyler {
             int[] r = jobRefRect;
             int tx = refT % RT_X, ty = refT / RT_X;
             float[] rect = uvGl(r[0], r[1], r[2], r[3]);
-            float[] inner = uvGl(tx * RT_W, ty * RT_H, (tx + 1) * RT_W, (ty + 1) * RT_H);
+            float[] inner = refT == REF_FULL ? rect : uvGl(tx * RT_W, ty * RT_H, (tx + 1) * RT_W, (ty + 1) * RT_H);
             // into the STAGE (not on screen yet): it appears with all the others in one slow focus pull
             stab.addRefine(main, rgba, jobRefW2, jobRefH2, rect, inner, crop, refT, 0f, false);
             if (stagedSinceNs < 0) {
@@ -994,7 +999,7 @@ public final class Restyler {
         if (stagedSinceNs < 0 || revealStartNs >= 0) {
             return;
         }
-        int left = jobRefTile >= 0 ? jobCandidates - 1 : jobCandidates;
+        int left = jobRefTile == REF_FULL ? 0 : jobRefTile >= 0 ? jobCandidates - 1 : jobCandidates;
         if (left <= 0) {
             revealStartNs = System.nanoTime();
         }
@@ -1220,6 +1225,9 @@ public final class Restyler {
             if (bx1 <= bx0) {                         // nothing changed: the history is still right ...
                 skipEma = 0.9 * skipEma + 0.1;
                 wLastWasPartial = false;
+                if (refT >= 0 && nCand >= REF_FULL_MIN) {
+                    return runRefine(REF_FULL);               // ... the whole screen at once: 12 tiles overlap 2.6x
+                }
                 return refT >= 0 ? runRefine(refT) : null;   // ... so spend the time on sharpening
             }
             boolean small = (bx1 - bx0) * (by1 - by0) < SHARPEN_MAX_CHANGE * PLANE;
@@ -1330,17 +1338,19 @@ public final class Restyler {
      * as RGBA rows bottom-up.
      */
     private ByteBuffer runRefine(int t) throws Exception {
-        int ox = Math.max(0, Math.min(REF_W - RC_W, 320 * (t % RT_X) - 88));   // 320 = 128 x 2.5
-        int oy = Math.max(0, Math.min(REF_H - RC_H, 240 * (t / RT_X) - 88));   // 240 = 96 x 2.5
-        int n = RC_W * RC_H;
+        boolean whole = t == REF_FULL;     // standing still: the whole screen in ONE run (no overlapping context)
+        int rcw = whole ? REF_W : RC_W, rch = whole ? REF_H : RC_H;
+        int ox = whole ? 0 : Math.max(0, Math.min(REF_W - RC_W, 320 * (t % RT_X) - 88));   // 320 = 128 x 2.5
+        int oy = whole ? 0 : Math.max(0, Math.min(REF_H - RC_H, 240 * (t / RT_X) - 88));   // 240 = 96 x 2.5
+        int n = rcw * rch;
         if (wRefIn == null) {
-            wRefIn = ByteBuffer.allocateDirect(3 * n * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+            wRefIn = ByteBuffer.allocateDirect(3 * REF_W * REF_H * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
         }
-        for (int y = 0; y < RC_H; y++) {
+        for (int y = 0; y < rch; y++) {
             int src = ((REF_H - 1 - (oy + y)) * REF_W + ox) * 4;   // the 1280x720 frame, GL rows bottom-up
-            for (int x = 0; x < RC_W; x++) {
+            for (int x = 0; x < rcw; x++) {
                 int i = src + x * 4;
-                int o = y * RC_W + x;
+                int o = y * rcw + x;
                 wRefIn.put(o, (refBytes[i] & 0xFF) / 255f);
                 wRefIn.put(n + o, (refBytes[i + 1] & 0xFF) / 255f);
                 wRefIn.put(2 * n + o, (refBytes[i + 2] & 0xFF) / 255f);
@@ -1354,12 +1364,13 @@ public final class Restyler {
                 return null;
             }
             n0 = System.nanoTime();
-            out = run(wRefIn.rewind(), RC_H, RC_W, 1f);
+            out = run(wRefIn.rewind().slice(0, 3 * n), rch, rcw, 1f);
             n1 = System.nanoTime();
         }
         int tx = t % RT_X, ty = t / RT_X;
-        int ex0 = Math.max(0, tx * RT_W - R_FEATHER), ey0 = Math.max(0, ty * RT_H - R_FEATHER);
-        int ex1 = Math.min(W, (tx + 1) * RT_W + R_FEATHER), ey1 = Math.min(H, (ty + 1) * RT_H + R_FEATHER);
+        int ex0 = whole ? 0 : Math.max(0, tx * RT_W - R_FEATHER), ey0 = whole ? 0 : Math.max(0, ty * RT_H - R_FEATHER);
+        int ex1 = whole ? W : Math.min(W, (tx + 1) * RT_W + R_FEATHER);
+        int ey1 = whole ? H : Math.min(H, (ty + 1) * RT_H + R_FEATHER);
         int w2 = 5 * (ex1 - ex0) / 2, h2 = 5 * (ey1 - ey0) / 2, m = w2 * h2;   // 2.5x (all sides are even)
         int x0 = 5 * ex0 / 2 - ox, y0 = 5 * ey0 / 2 - oy;                     // the tile in the network input
         float[] pr = new float[3 * m];
@@ -1367,7 +1378,7 @@ public final class Restyler {
         for (int c = 0; c < 3; c++) {
             for (int y = 0; y < h2; y++) {
                 for (int x = 0; x < w2; x++) {
-                    int si = c * n + (y0 + y) * RC_W + (x0 + x);
+                    int si = c * n + (y0 + y) * rcw + (x0 + x);
                     float v = out[si];
                     pr[c * m + y * w2 + x] = v >= 0f ? (v > 1f ? 1f : v) : 0f;
                     vr[c * m + y * w2 + x] = wRefIn.get(si);

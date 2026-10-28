@@ -25,9 +25,12 @@ where git >nul 2>nul || (echo git not found - skipped. & goto :done)
 if not exist .git git init -b main
 git add -A
 git commit -m "Restyler V3 (3.0.0)" || echo (nothing new to commit, or set: git config --global user.name / user.email)
-echo.
-echo To put it on GitHub:   gh repo create SwiPixel/restyler --public --source . --push
-echo   (or create an empty repo on github.com, then: git remote add origin URL ^& git push -u origin main)
+git remote get-url origin >nul 2>nul && (
+    echo Pushing to GitHub...
+    git push || echo Push failed - run "git push" yourself and read the message.
+) || (
+    echo No GitHub remote yet:  gh repo create SwiPixel/restyler --public --source . --push
+)
 
 :done
 echo.

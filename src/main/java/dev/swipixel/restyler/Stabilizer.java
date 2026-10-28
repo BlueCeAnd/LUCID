@@ -79,6 +79,8 @@ final class Stabilizer {
     private int resultTex = -1;
     private final int[] refTex = new int[12];  // sharpened (2.5x) tiles, one slot per tile
     static final int REF_MAX_W = 360, REF_MAX_H = 280;
+    private int refFullTex = -1;                       // the whole screen at 2.5x (standing still: one run)
+    private int refTexW = REF_MAX_W, refTexH = REF_MAX_H;   // size of the tile texture in use
     static final int HIST_W = 1280, HIST_H = 720;   // history at 2.5x: keeps the sharpened detail
     private int vanFbo = -1, vanTex = -1;      // copy of the current frame (shader can't read the screen it draws on)
     private int vmidFbo = -1, vmidTex = -1;    // current frame crop at 1024x576 ...
@@ -500,6 +502,7 @@ final class Stabilizer {
         for (int i = 0; i < refTex.length; i++) {   // one per tile: several can be fading in at once
             refTex[i] = target(REF_MAX_W, REF_MAX_H, GL11.GL_RGBA8, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, true)[1];
         }
+        refFullTex = target(HIST_W, HIST_H, GL11.GL_RGBA8, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, true)[1];
         t = target(W, H, GL11.GL_RGBA8, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, true);
         capVanFbo = t[0];
         capVanTex = t[1];
@@ -674,14 +677,18 @@ final class Stabilizer {
      */
     void addRefine(Framebuffer main, ByteBuffer rgba, int w2, int h2, float[] rect, float[] inner, float[] crop,
                    int slot, float alpha, boolean done) {
-        GlStateManager._bindTexture(refTex[slot]);
+        boolean whole = w2 > REF_MAX_W || h2 > REF_MAX_H;
+        int tex = whole ? refFullTex : refTex[slot];
+        refTexW = whole ? HIST_W : REF_MAX_W;
+        refTexH = whole ? HIST_H : REF_MAX_H;
+        GlStateManager._bindTexture(tex);
         GlStateManager._pixelStore(GL11.GL_UNPACK_ROW_LENGTH, 0);
         GlStateManager._pixelStore(GL11.GL_UNPACK_SKIP_ROWS, 0);
         GlStateManager._pixelStore(GL11.GL_UNPACK_SKIP_PIXELS, 0);
         GlStateManager._pixelStore(GL11.GL_UNPACK_ALIGNMENT, 4);
         GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, w2, h2, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, rgba);
         GlStateManager._bindTexture(0);
-        integrate(main, refTex[slot], crop, 1f, true, null, rect, inner, w2, h2, alpha, false, false, done);
+        integrate(main, tex, crop, 1f, true, null, rect, inner, w2, h2, alpha, false, false, done);
     }
 
     /** One more fade step of an already added tile (same camera: the history hasn't moved since). */
@@ -765,8 +772,8 @@ final class Stabilizer {
             if (refRect != null) {
                 p.vec4("uRefRect", refRect);
                 p.vec4("uRefInner", refInner);
-                GL20.glUniform2f(GL20.glGetUniformLocation(progStage, "uRefScale"), w2 / (float) REF_MAX_W,
-                        h2 / (float) REF_MAX_H);
+                GL20.glUniform2f(GL20.glGetUniformLocation(progStage, "uRefScale"), w2 / (float) refTexW,
+                        h2 / (float) refTexH);
                 GL20.glUniform2f(GL20.glGetUniformLocation(progStage, "uFeatherUv"), 8f / W, 8f / H);
             }
             p.draw();

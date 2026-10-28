@@ -26,7 +26,13 @@ Model host: https://huggingface.co/SwiPixel/RestylerV3 (`BASE_URL` and SHA-256s 
    then commits this folder to git.
 2. `gradlew build` (Minecraft closed) → `build\libs\restyler-3.0.0.jar`. `copyit.bat` puts it into your instance.
 3. Test like a new player: move `config\restyler` away, start the game, watch the action bar ("downloading ...").
-4. GitHub: `gh repo create SwiPixel/restyler --public --source . --push`.
+4. GitHub: the repo (github.com/swipixel/restyler) and its remote already exist - `publish.bat` pushes (or run `git push`).
 
 Only one Restyler jar in `mods` at a time (this one replaces the dev build; both are mod id `restyler`).
 Existing configs keep their own settings; the new defaults apply to new players (or delete `config/restyler/restyler.properties`).
+
+## Modrinth (500 MiB limit)
+After `gradlew build`, run `make_modrinth.bat` -> `build\libs\modrinth\restyler-3.0.0.jar` (~270 MiB). Only the Linux GPU providers
+are removed from the bundled ONNX Runtime: Windows natives stay byte-identical (checked), Linux still runs on the CPU.
+The tool re-reads the whole output and refuses to write it if anything is off. Upload that file; the full jar is fine
+for GitHub (2 GiB limit).
