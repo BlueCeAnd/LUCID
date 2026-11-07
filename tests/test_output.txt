@@ -1,0 +1,61 @@
+Slots: 32 (14 moods, 12 styles, 6 effects), wet = slot 26
+
+[parser]
+  warning: test.txt:15: badbase: a base line with only offsets (+/-) is invalid - line ignored
+  warning: test.txt:16: typo: unknown slider 'goldenhour' - line ignored
+  warning: test.txt:17: badnum: bad number in 'golden_hour fifty' - line ignored
+  warning: test.txt:18: nan: bad number in 'golden_hour NaN' - line ignored
+  warning: test.txt:19: bad key 'badcond @teatime' (expected <biome>, <biome> @<condition> or <biome> ~)
+  warning: test.txt:20: missing '=' in 'no equals sign here'
+  warning: test.txt:21: bad key 'two words' (expected <biome>, <biome> @<condition> or <biome> ~)
+  warning: test.txt:22: unclosed: prompt needs a closing quote - line ignored
+  warning: test.txt:23: rangeprompt ~: a ~ line needs slider ranges, not a prompt - line ignored
+  warning: test.txt:24: badpart: expected '<slider> <value>', got 'cozy' - line ignored
+  warning: test.txt:25: desert is defined twice, this later line wins
+
+[default biomes.txt]
+  64 vanilla biomes, 54 overworld with base + conditions + ~, 5 Nether, 5 End
+
+[condition weights over a day]
+  dawn  max change per tick 0.00103 (a jump would be ~1)
+  noon  max change per tick 0.00075 (a jump would be ~1)
+  dusk  max change per tick 0.00103 (a jump would be ~1)
+  night max change per tick 0.00100 (a jump would be ~1)
+  sum   max change per tick 0.00103, range 0.117 .. 1.000
+  t:      0   2000   4000   6000   8000  10000  12000  14000  16000  18000  20000  22000
+  dawn    1.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+  noon    0.00   0.50   1.00   1.00   1.00   0.50   0.00   0.00   0.00   0.00   0.00   0.00
+  dusk    0.00   0.00   0.00   0.00   0.00   0.00   1.00   0.00   0.00   0.00   0.00   0.00
+  night   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.74   1.00   1.00   1.00   1.00
+
+[biome noise]
+  10000 blocks: range -0.733 .. 0.703, mean -0.102, max change per block 0.00497
+  desert at (1234.5, -987.25): golden_hour 0.520 (base 0.50 +-0.15), misty_morning 0.079 (0..0.15)
+
+[zone weights]
+  sphere r=10 blend=8: d=10 1.00, 12 0.84, 14 0.50, 16 0.16, 18 0.00
+
+[layer order]
+  1 global: stormy 50, cozy 20 -> cozy 20, stormy 50
+  2-4 biomes: desert 100%
+    desert 100%: base apocalyptic 40, golden_hour 90 | time/weather golden_hour +10, frozen +60 | variation no change
+    conditions: dawn 0.00  noon 1.00  dusk 0.00  night 0.00  rain 0.00  thunder 0.00  (sky 1.00)
+  5 zones: none here
+  = world look: apocalyptic 40, golden_hour 100, frozen 60
+  5 zone b (prio 1, offset) weight 1.00: no change
+  5 zone a (prio 5, set) weight 1.00: horror +80, cozy -40
+
+[weather rules + sky access]
+
+[desert -> plains border at x = 0, walking along z = 7]
+  x:   -60   -50   -40   -30   -20   -10     0    10    20    30    40    50    60
+  desert share:  1.00  1.00  0.98  0.92  0.78  0.57  0.32  0.12  0.04  0.00  0.00  0.00  0.00
+  plains share 10% at x=-27.3, 90% at x=12.5 -> 39.8 blocks; biggest change per 1/4 block 0.030
+
+[asymmetric wet ease, 20 ticks / s]
+  wet up to 63% in 30.0 s (want 30), other sliders in 4.0 s (want 4); dries to 37% in 120.0 s (want 120), to 10% in 276 s
+
+[performance: one resolve = 3 biomes from 25 samples, 3 zones]
+  resolve 7.1 us, grid 1.06 us (budget 200 us; the 25 world.getBiome calls are not included)
+
+ALL PASSED (297 checks)

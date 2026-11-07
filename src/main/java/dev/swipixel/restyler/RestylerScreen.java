@@ -7,7 +7,6 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
 
-import java.util.List;
 import java.util.function.DoubleConsumer;
 
 /** Menu (key O). The game keeps running behind it, so every change is visible immediately. */
@@ -28,139 +27,49 @@ public class RestylerScreen extends Screen {
         int x = (width - BW) / 2;
         int y = 34;
 
-        addDrawableChild(ButtonWidget.builder(lookText(), b -> {
-            r.setLook(r.getLook().next());
-            b.setMessage(lookText());
-        }).dimensions(x, y, BW, BH).tooltip(Tooltip.of(Text.literal(
-                "Auto (weather): normal when dry, WetCraft while it rains (only in biomes where it rains). "
-                        + "Dries over about a minute after the rain stops.\n"
-                        + "Normal: realistic materials.\nWetCraft: always wet."))).build());
+        int tw = (BW - 2 * GAP) / 3;
+        addDrawableChild(ButtonWidget.builder(Text.literal("Moods"), b ->
+                client.setScreen(new MoodScreen(this))).dimensions(x, y, tw, BH).tooltip(Tooltip.of(Text.literal(
+                "Now: " + Mood.summary() + "\n"
+                        + "Dark fantasy, aurora night, gothic, apocalyptic, horror, golden hour, cozy, dreamy, cinematic, vibrant, "
+                        + "misty morning, neon night, frozen, stormy - each with its own % slider, mixable.\n"
+                        + "Drawn with the real depth (fog grows with distance)."))).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Styles"), b ->
+                client.setScreen(new StyleScreen(this))).dimensions(x + tw + GAP, y, tw, BH).tooltip(Tooltip.of(Text.literal(
+                "Now: " + Style.summary() + "\n"
+                        + "Anime, pastel, oil paint, watercolor, comic, pencil sketch, noir, old film, vaporwave, retro green - "
+                        + "mixable % sliders. Pixelate and CRT / VHS stack on top of any style."))).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Effects"), b ->
+                client.setScreen(new EffectScreen(this))).dimensions(x + 2 * (tw + GAP), y, BW - 2 * (tw + GAP), BH).tooltip(Tooltip.of(Text.literal(
+                "Now: " + Effect.summary() + "\n"
+                        + "Wet puddles with real reflections, snow cover, overgrown ruins, realistic light (sun shadows, "
+                        + "ambient occlusion, haze), depth of field, tilt-shift. Built from the depth buffer."))).build());
         y += BH + GAP;
-
-        addDrawableChild(new Slider(x, y, BW, BH, "Strength", r.getStrength(), v -> r.setStrength((float) v)));
-        y += BH + GAP;
-
         addDrawableChild(ButtonWidget.builder(onOff("Restyler", r.isEnabled()), b -> {
             r.setEnabled(!r.isEnabled());
             b.setMessage(onOff("Restyler", r.isEnabled()));
-        }).dimensions(x, y, BW, BH).build());
-        y += BH + GAP + 6;
-
-        int hw = (BW - GAP) / 2;
-        addDrawableChild(ButtonWidget.builder(onOff("Keep dark", r.isKeepDark()), b -> {
-            r.setKeepDark(!r.isKeepDark());
-            b.setMessage(onOff("Keep dark", r.isKeepDark()));
-        }).dimensions(x, y, hw, BH).tooltip(Tooltip.of(Text.literal(
-                "ON: at night and in caves the filter can't brighten pitch black (no free night vision)"))).build());
-        addDrawableChild(ButtonWidget.builder(dehazeText(), b -> {
-            r.setDehaze(1 - r.getDehaze());
-            b.setMessage(dehazeText());
-        }).dimensions(x + hw + GAP, y, hw, BH).tooltip(Tooltip.of(Text.literal(
-                "levels: stretch the darkest 1% back to black (more contrast)"))).build());
-        y += BH + GAP;
-
-        addDrawableChild(ButtonWidget.builder(onOff("Performance", r.isStabilizer()), b -> {
-            r.setStabilizer(!r.isStabilizer());
-            clearAndInit();   // the Performance-only controls appear / disappear
-        }).dimensions(x, y, hw, BH).tooltip(Tooltip.of(Text.literal(
-                "Performance mode: 60 FPS - the network runs in the background and its look is moved along with "
-                        + "the camera.\n!! Greatly reduces quality: rain reflections, gloss and fine details suffer.\n"
-                        + "OFF (recommended): full quality, the network runs on every frame (lower FPS)."))).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Model: " + shortModel(r.loadedModel())), b -> {
-            List<String> files = r.modelFiles();
-            if (!files.isEmpty()) {
-                int cur = files.indexOf(r.loadedModel());
-                r.useModel(files.get((cur + 1) % files.size()));
-                b.setMessage(Text.literal("Model: " + shortModel(files.get((cur + 1) % files.size()))));
-            }
-        }).dimensions(x + hw + GAP, y, hw, BH).tooltip(Tooltip.of(Text.literal(
-                "Cycle through the .onnx files in config/restyler"))).build());
-        y += BH + GAP;
-
-        if (r.isAsync()) {
-            addDrawableChild(new Slider(x, y, BW, BH, "Detail", r.getDetail() / 1.5,
-                    v -> r.setDetail((float) (v * 1.5))));
-            y += BH + GAP;
-        }
-        addDrawableChild(ButtonWidget.builder(partialText(), b -> {
-            r.setPartialUpdate(!r.isPartialUpdate());
-            b.setMessage(partialText());
-        }).dimensions(x, y, hw, BH).tooltip(Tooltip.of(Text.literal(
-                "ON: only the part of the screen that changed is repainted (turning: the new strip; standing "
-                        + "still: nothing, or just the moving mob).\nPerformance OFF: more FPS while little changes "
-                        + "(walking forward stays ~20). Reused parts keep their old reflections until they are "
-                        + "repainted.\nPerformance ON: the look follows faster, the GPU rests.\n"
-                        + "Needs <model>_partial.onnx next to the model (make_partial.py)."))).build());
-        addDrawableChild(ButtonWidget.builder(onOff("Sharpen", r.isSharpen()), b -> {
-            r.setSharpen(!r.isSharpen());
-            b.setMessage(onOff("Sharpen", r.isSharpen()));
-        }).dimensions(x + hw + GAP, y, hw, BH).tooltip(Tooltip.of(Text.literal(
-                "Needs Partial update. Free time repaints the screen at 2.5x resolution, tile by tile in the "
-                        + "background; when all is done the screen focuses at once (about 1.2 s standing). Sharp parts "
-                        + "move with the camera and survive repaints; what changes drops back to 1x.\nNot in WetCraft "
-                        + "(its puddles would turn into small glints)."))).build());
-        y += BH + GAP;
-        addDrawableChild(ButtonWidget.builder(onOff("Light lock", r.isLightLock()), b -> {
-            r.setLightLock(!r.isLightLock());
-            b.setMessage(onOff("Light lock", r.isLightLock()));
-        }).dimensions(x, y, hw, BH).tooltip(Tooltip.of(Text.literal(
-                "ON: the game decides where it is light (torches, sky); the model only changes materials.\n"
-                        + "Stops far walls going dark and lighting up as you walk closer."))).build());
-        addDrawableChild(ButtonWidget.builder(vigText(), b -> {
-            r.setDevignette(!r.isDevignette());
-            b.setMessage(vigText());
-        }).dimensions(x + hw + GAP, y, hw, BH).tooltip(Tooltip.of(Text.literal(
-                "Removes the model's screen-fixed darkening (the 'shadow' that follows the middle of the screen).\n"
-                        + "Needs vignette.json in config/restyler (made by vignette_v3.py)."))).build());
-        y += BH + GAP + 6;
-
-        addDrawableChild(ButtonWidget.builder(onOff("Debug view", r.isDebugView()), b -> {
-            r.setDebugView(!r.isDebugView());
-            b.setMessage(onOff("Debug view", r.isDebugView()));
         }).dimensions(x, y, BW, BH).tooltip(Tooltip.of(Text.literal(
-                "Performance or Partial only. Colours what is cached:\ngreen = sharp (2.5x)\nblue = sharp, waiting "
-                        + "for the focus\nyellow = 1x\nred = not cached / being repainted\nwhite lines = the 12 "
-                        + "sharpening tiles"))).build());
+                "Turn all looks on or off (key K). Tip: /vibe <words> picks a mix for you."))).build());
         y += BH + GAP;
+        addDrawableChild(ButtonWidget.builder(Text.literal("World looks"), b ->
+                client.setScreen(new WorldScreen(this))).dimensions(x, y, BW, BH).tooltip(Tooltip.of(Text.literal(
+                WorldLook.INSTANCE.statusTag() + "\n"
+                        + "Looks per biome, time of day, weather and placed zones. Your own sliders always win"
+                        + " (pinned) until you turn world looks on again (/vibe auto)."))).build());
+        y += BH + GAP + 6;
         addDrawableChild(ButtonWidget.builder(Text.literal("Done"), b -> close()).dimensions(x, y, BW, BH).build());
         bottom = y + BH + 8;
     }
 
     private int bottom = 0;
 
-    private Text lookText() {
-        return Text.literal("Look: " + r.getLook().title);
-    }
-
-    private Text vigText() {
-        return Text.literal("Vignette: " + (!r.hasVignette() ? "no file" : r.isDevignette() ? "ON" : "OFF"));
-    }
-
     private static Text onOff(String name, boolean on) {
         return Text.literal(name + ": " + (on ? "ON" : "OFF"));
     }
 
-    private Text partialText() {
-        return Text.literal("Partial: " + (!r.hasPartialModel() ? "no model" : r.isPartialUpdate() ? "ON" : "OFF"));
-    }
-
-    private Text dehazeText() {
-        return Text.literal("Dehaze: " + (r.getDehaze() == 0 ? "off" : "levels"));
-    }
-
-    private Text speedText() {
-        int n = r.getRunEvery();
-        return Text.literal(n == 1 ? "Every frame" : "Every " + n + (n == 2 ? "nd" : "rd") + " frame");
-    }
-
-    private static String shortModel(String m) {
-        String s = m.replace(".onnx", "").replace("restyler_", "");
-        return s.length() > 12 ? s.substring(0, 12) + ".." : s;
-    }
-
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // no blur: the restyled world stays visible behind the menu
+        // no blur: the styled world stays visible behind the menu
         int x = (width - BW) / 2;
         context.fill(x - 8, 8, x + BW + 8, bottom, 0x88000000);
     }
@@ -177,20 +86,26 @@ public class RestylerScreen extends Screen {
         return false;
     }
 
-    private static final class Slider extends SliderWidget {
+    static final class Slider extends SliderWidget {
         private final String label;
         private final DoubleConsumer onChange;
+        private final double scale;    // shown % = value * 100 * scale
 
         Slider(int x, int y, int w, int h, String label, double value, DoubleConsumer onChange) {
+            this(x, y, w, h, label, value, 1.0, onChange);
+        }
+
+        Slider(int x, int y, int w, int h, String label, double value, double scale, DoubleConsumer onChange) {
             super(x, y, w, h, Text.empty(), value);
             this.label = label;
             this.onChange = onChange;
+            this.scale = scale;
             updateMessage();
         }
 
         @Override
         protected void updateMessage() {
-            setMessage(Text.literal(label + ": " + Math.round(value * 100) + "%"));
+            setMessage(Text.literal(label + ": " + Math.round(value * 100 * scale) + "%"));
         }
 
         @Override

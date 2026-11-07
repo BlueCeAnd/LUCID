@@ -1,0 +1,25 @@
+# Biome looks: the look of each biome while world looks are ON (/vibe auto). Values are slider percent (0-100).
+#
+# DEFAULT: a biome without its own line gets what /vibe makes of its NAME ("birch_forest" -> /vibe birch forest),
+# moods, styles and effects alike, with +-10 % variation over the world on every slider it sets.
+# Modded biomes work the same way ("mymod:crystal_caves" -> "crystal caves").
+#
+# Your own lines override that, per biome:
+#   <biome> = <sliders>          base: a plain number sets that slider, sliders not named are 0
+#   <biome> = "some words"       base from a prompt instead of the biome's name
+#   <biome> @<cond> = <line>     dawn noon dusk night rain snow thunder. +N / -N = offset scaled by the condition,
+#                                a plain N moves that slider toward N. Nothing happens where there's no sky.
+#   <biome> ~ = <ranges>         variation over the world: "golden_hour 15" = +-15 %, "misty_morning 0..15" = 0..+15 %.
+#   * @<cond> = ...              for every biome without its own line for that condition
+#   * = <line>                   would replace the name rule for every biome without its own base line
+# Rain lines are skipped in biomes without rain (desert, savanna, badlands); in snowy places @snow replaces @rain.
+# Sliders: moods  dark_fantasy aurora_night gothic apocalyptic horror golden_hour cozy dreamy cinematic vibrant
+#                 misty_morning neon_night frozen stormy
+#          styles anime pastel oil_paint watercolor comic sketch noir old_film vaporwave retro_green pixelate crt
+#          effects wet snow overgrown realistic depth_of_field tilt_shift
+# Your own copy: config/restyler/biomes.txt overrides this file (/vibe biome ... writes it for you).
+
+# ---- weather, for every biome: the world gets wet in rain, white in snow, dark in thunder
+* @rain        = stormy +25, misty_morning +10, wet 50
+* @snow        = frozen +20, stormy +10, snow 75
+* @thunder     = stormy +40, cinematic +10, wet 65

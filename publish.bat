@@ -1,45 +1,22 @@
 @echo off
-rem 1) uploads hf\ (model, styles.json, model card) to https://huggingface.co/SwiPixel/RestylerV3
-rem 2) makes this folder a git repo with one commit (pushing to GitHub is up to you, see the end)
+rem Makes this folder a git repo (first time) and commits + pushes everything. Build the jar with: gradlew build
 setlocal
 cd /d "%~dp0"
-set REPO=SwiPixel/RestylerV3
-
-echo === Hugging Face ===
-where hf >nul 2>nul || (
-    echo Installing the Hugging Face CLI...
-    python -m pip install -U "huggingface_hub[cli]" || goto :fail
-)
-where hf >nul 2>nul || (echo "hf" is not on PATH yet - open a new terminal and run publish.bat again. & goto :fail)
-hf auth whoami || (
-    echo Not logged in. Run:  hf auth login   and paste a WRITE token from huggingface.co/settings/tokens
-    goto :fail
-)
-rem creates the repo (public) if it doesn't exist yet
-hf upload %REPO% hf . --commit-message "Restyler V3: ep60 + partial model + styles.json" || goto :fail
-echo Uploaded. Check: https://huggingface.co/%REPO%/tree/main
-
-echo.
-echo === git ===
-where git >nul 2>nul || (echo git not found - skipped. & goto :done)
+where git >nul 2>nul || (echo git not found. & goto :fail)
 if not exist .git git init -b main
 git add -A
-git commit -m "Restyler V3 (3.0.0)" || echo (nothing new to commit, or set: git config --global user.name / user.email)
+git commit -m "Restyler 4.0.0 - shader looks, AI removed" || echo (nothing new to commit, or set: git config --global user.name / user.email)
 git remote get-url origin >nul 2>nul && (
     echo Pushing to GitHub...
     git push || echo Push failed - run "git push" yourself and read the message.
 ) || (
     echo No GitHub remote yet:  gh repo create SwiPixel/restyler --public --source . --push
 )
-
-:done
 echo.
 echo Done.
 pause
 exit /b 0
 
 :fail
-echo.
-echo FAILED - see the message above.
 pause
 exit /b 1

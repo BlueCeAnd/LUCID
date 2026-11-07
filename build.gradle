@@ -19,10 +19,9 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    // ONNX Runtime runs the network. "include" packs it INSIDE the mod jar,
-    // so nothing extra has to go into the mods folder (the jar becomes big).
-    implementation "com.microsoft.onnxruntime:onnxruntime_gpu:${project.onnxruntime_version}"
-    include "com.microsoft.onnxruntime:onnxruntime_gpu:${project.onnxruntime_version}"
+    // ONNX Runtime (CPU) only for /vibe: runs CLIP's text encoder. "include" packs it inside the mod jar.
+    implementation "com.microsoft.onnxruntime:onnxruntime:${project.onnxruntime_version}"
+    include "com.microsoft.onnxruntime:onnxruntime:${project.onnxruntime_version}"
 }
 
 processResources {

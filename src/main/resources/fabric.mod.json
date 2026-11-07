@@ -3,7 +3,7 @@
   "id": "restyler",
   "version": "${version}",
   "name": "Restyler",
-  "description": "Local real-time AI restyling for Minecraft on your own GPU. Realistic materials, and WetCraft when it rains.",
+  "description": "Shader looks for Minecraft built from the depth buffer: moods (golden hour, gothic, neon night...), art styles (anime, oil paint, comic...), and effects (wet, snow, overgrown, depth of field). /vibe <words> picks a mix with CLIP.",
   "authors": [
     "SwiPixel"
   ],
