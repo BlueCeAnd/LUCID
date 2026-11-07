@@ -1,4 +1,4 @@
-# Restyler 4.0.0: shader looks for Minecraft
+# Restyler 1.1.89: shader looks for Minecraft
 
 Fabric 1.21.1 + Fabric API, client only. Put `restyler-4.0.0.jar` into `mods`. The optional CLIP text encoder is installed automatically from the jar the first time `/vibe` is used.
 Every look is a full-screen GPU pass built from the game's depth buffer. There's no AI network: the AI mode was
